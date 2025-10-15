@@ -4,7 +4,6 @@ from openai import OpenAI
 import re
 import logging
 import time
-from transformers import AutoTokenizer , AutoModelForCausalLM
 
 os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 BASE_URL = 'https://api.openai-proxy.org/v1'
@@ -136,7 +135,8 @@ Please reply with ONLY the COMPLETE REPAIRED CODE (rather than code fragments) a
 
         token_info_list.append(token_info)
         model_responses_list.append(response.choices[0].message.content)
-        time.sleep(100)
+        time.sleep(1)
+
     return token_info_list , model_responses_list
 
 def parse_and_generate_variants(model: str , mode , temperature=0.3):
@@ -199,34 +199,30 @@ def parse_and_generate_variants(model: str , mode , temperature=0.3):
 
 def parse_and_generate_variants_for_TrickyBugs(client , model: str , k=2 , temperature=0.3):
     dataset_path = "./Datasets/TrickyBugs"
-    for dir in os.listdir(dataset_path)[:10]:
+    dataset_code_path = os.path.join(dataset_path , "PUT_python")
+    description_path = os.path.join(dataset_path , "problem_descriptions")
+
+    for dir in os.listdir(os.path.join(dataset_code_path))[:10]:
         problem_description = None
         put_code = None
 
-        flag = True
-        for file in os.listdir(os.path.join(dataset_path , dir)):
-            if file == "problem_description.txt":
-                with open(os.path.join(dataset_path , dir , file) , 'r' , encoding='utf-8') as f:
-                    problem_description = f.read()
-            elif file == "buggy_programs":
-                if not os.path.exists(os.path.join(dataset_path , dir , file , "python")):
-                    flag = False
-                    break
-                for sub_dir in os.listdir(os.path.join(dataset_path , dir , file , "python")):
-                    assert sub_dir.endswith(".py")
-                    with open(os.path.join(dataset_path , dir , file , "python" , sub_dir) , 'r' , encoding='utf-8') as code_file:
-                        put_code = code_file.read()
-            else:
-                continue
+        with open(os.path.join(description_path , dir , "problem_description.txt") , 'r' , encoding='utf-8') as f:
+            problem_description = f.read()
+            f.close()
         
-        if flag:
+        for file in os.listdir(os.path.join(dataset_code_path , dir)):
+            print(file)
+            with open(os.path.join(dataset_code_path , dir , file) , 'r' , encoding='utf-8') as f:
+                put_code = f.read()
+                f.close()
+
             # generate_variants_trickbugs(client , problem_description , put_code , model)
             token_info_list , response_list = generate_variants_trickbugs(client , problem_description , put_code , model , k=k , temperature=temperature)
             for idx , response in enumerate(response_list):
                 dir_name = f"./TrickyBugs/{model}/GenProgs/tc_generated_progs_python/{dir}"
                 if not os.path.exists(dir_name):
                     os.makedirs(dir_name)
-                with open(os.path.join(dir_name , dir + "_num_" + str(idx)) , "w" , encoding='utf-8') as resp_file:
+                with open(os.path.join(dir_name , file.split(".")[0] + "_num_" + str(idx)) , "w" , encoding='utf-8') as resp_file:
                     resp_file.write(response)
 
 def transform_code(model: str):
@@ -366,14 +362,14 @@ if __name__ == '__main__':
 
     #         parse_and_generate_variants(model="gpt-4o-mini" , mode=mode)
 
-    # client = OpenAI(base_url=BASE_URL , api_key=API_KEY)
-    # # parse_and_generate_variants_for_TrickyBugs(client , model="gpt-3.5-turbo-1106")
-    # # parse_and_generate_variants_for_TrickyBugs(client , model="gpt-4o-mini" , k=6 , temperature=0.8)
-    # # transform_code_for_TrickyBugs("gpt-3.5-turbo-1106")
-    # transform_code_for_TrickyBugs("gpt-4o-mini")
+    client = OpenAI(base_url=BASE_URL , api_key=API_KEY)
+    # parse_and_generate_variants_for_TrickyBugs(client , model="gpt-3.5-turbo-1106")
+    parse_and_generate_variants_for_TrickyBugs(client , model="gpt-4o-mini" , k=6 , temperature=0.8)
+    # transform_code_for_TrickyBugs("gpt-3.5-turbo-1106")
+    transform_code_for_TrickyBugs("gpt-4o-mini")
 
-    model_name = "Qwen/Qwen2.5-0.5B-Instruct"
+    # model_name = "Qwen/Qwen2.5-0.5B-Instruct"
     # model , tokenizer = load_model(model_name)
     # parse_and_generate_variants_for_TrickyBugs_by_model(model , tokenizer , model_name)
 
-    transform_code_for_TrickyBugs(model_name)
+    # transform_code_for_TrickyBugs(model_name)
