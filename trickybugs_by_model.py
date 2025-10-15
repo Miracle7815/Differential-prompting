@@ -131,73 +131,62 @@ Please reply with ONLY the COMPLETE REPAIRED CODE (rather than code fragments) a
 
 def parse_and_generate_variants_for_TrickyBugs_by_model_vllm(model, tokenizer, sampling_params, model_name, k=6):
     dataset_path = "./Datasets/TrickyBugs"
-    for dir in os.listdir(dataset_path):
+    dataset_code_path = os.path.join(dataset_path , "PUT_python")
+    description_path = os.path.join(dataset_path , "problem_descriptions")
+
+    for dir in os.listdir(os.path.join(dataset_code_path))[:10]:
         problem_description = None
         put_code = None
 
-        flag = True
-        for file in os.listdir(os.path.join(dataset_path, dir)):
-            if file == "problem_description.txt":
-                with open(os.path.join(dataset_path, dir, file), 'r', encoding='utf-8') as f:
-                    problem_description = f.read()
-            elif file == "buggy_programs":
-                if not os.path.exists(os.path.join(dataset_path, dir, file, "python")):
-                    flag = False
-                    break
-                for sub_dir in os.listdir(os.path.join(dataset_path, dir, file, "python")):
-                    assert sub_dir.endswith(".py")
-                    with open(os.path.join(dataset_path, dir, file, "python", sub_dir), 'r',
-                              encoding='utf-8') as code_file:
-                        put_code = code_file.read()
-            else:
-                continue
-
-        if flag:
+        with open(os.path.join(description_path , dir , "problem_description.txt") , 'r' , encoding='utf-8') as f:
+            problem_description = f.read()
+            f.close()
+        
+        for file in os.listdir(os.path.join(dataset_code_path , dir)):
+            print(file)
+            with open(os.path.join(dataset_code_path , dir , file) , 'r' , encoding='utf-8') as f:
+                put_code = f.read()
+                f.close()
+                
             response_list = generate_variants_by_model_vllm(problem_description, put_code, model, sampling_params,
                                                             tokenizer, k)
             for idx, response in enumerate(response_list):
                 dir_name = f"./TrickyBugs/{model_name}/GenProgs/tc_generated_progs_python/{dir}"
                 if not os.path.exists(dir_name):
                     os.makedirs(dir_name)
-                with open(os.path.join(dir_name, dir + "_num_" + str(idx)), "w", encoding='utf-8') as resp_file:
+                with open(os.path.join(dir_name , file.split(".")[0] + "_num_" + str(idx)) , "w" , encoding='utf-8') as resp_file:
                     resp_file.write(response)
 
 
 def parse_and_generate_variants_for_TrickyBugs_by_model(model, tokenizer, model_name, k=6, temperature=0.8,
                                                         max_new_token=1024):
     dataset_path = "./Datasets/TrickyBugs"
-    for dir in os.listdir(dataset_path):
+    dataset_code_path = os.path.join(dataset_path , "PUT_python")
+    description_path = os.path.join(dataset_path , "problem_descriptions")
+
+    for dir in os.listdir(os.path.join(dataset_code_path))[:10]:
         problem_description = None
-        put_code_dict = {}
+        put_code = None
 
-        flag = True
-        for file in os.listdir(os.path.join(dataset_path, dir)):
-            if file == "problem_description.txt":
-                with open(os.path.join(dataset_path, dir, file), 'r', encoding='utf-8') as f:
-                    problem_description = f.read()
-            elif file == "buggy_programs":
-                if not os.path.exists(os.path.join(dataset_path, dir, file, "python")):
-                    flag = False
-                    break
-                for sub_dir in os.listdir(os.path.join(dataset_path, dir, file, "python")):
-                    assert sub_dir.endswith(".py")
-                    with open(os.path.join(dataset_path, dir, file, "python", sub_dir), 'r',
-                              encoding='utf-8') as code_file:
-                        put_code_dict['sub_dir'] = code_file.read()
-            else:
-                continue
+        with open(os.path.join(description_path , dir , "problem_description.txt") , 'r' , encoding='utf-8') as f:
+            problem_description = f.read()
+            f.close()
+        
+        for file in os.listdir(os.path.join(dataset_code_path , dir)):
+            print(file)
+            with open(os.path.join(dataset_code_path , dir , file) , 'r' , encoding='utf-8') as f:
+                put_code = f.read()
+                f.close()
 
-        if flag:
-            for code_file_name, put_code in put_code_dict.values():
-                response_list = generate_variants_by_model(problem_description, put_code, model, tokenizer, k,
-                                                           temperature, max_new_token)
-                for idx, response in enumerate(response_list):
-                    dir_name = f"./TrickyBugs/{model_name}/GenProgs/tc_generated_progs_python/{dir}/{code_file}"
-                    if not os.path.exists(dir_name):
-                        os.makedirs(dir_name)
-                    # with open(os.path.join(dir_name , dir + "_num_" + str(idx)) , "w" , encoding='utf-8') as resp_file:
-                    with open(os.path.join(dir_name, "_num_" + str(idx)), "w", encoding='utf-8') as resp_file:
-                        resp_file.write(response)
+            response_list = generate_variants_by_model(problem_description, put_code, model, tokenizer, k,
+                                                        temperature, max_new_token)
+            for idx, response in enumerate(response_list):
+                dir_name = f"./TrickyBugs/{model_name}/GenProgs/tc_generated_progs_python/{dir}"
+                if not os.path.exists(dir_name):
+                    os.makedirs(dir_name)
+                # with open(os.path.join(dir_name , dir + "_num_" + str(idx)) , "w" , encoding='utf-8') as resp_file:
+                with open(os.path.join(dir_name , file.split(".")[0] + "_num_" + str(idx)) , "w" , encoding='utf-8') as resp_file:
+                    resp_file.write(response)
 
 
 def transform_code_for_TrickyBugs(model: str):
@@ -319,43 +308,35 @@ io.input_writeln(tree.to_str(output=Edge.unweighted_edge)) # Output the unweight
 
 
 def parse_and_generate_test_for_TrickyBugs_by_model(model, tokenizer, model_name, temperature=0.8, max_new_token=1024):
-    dataset_dir = "./Datasets/TrickyBugs"
     pid = os.getpid()
-    for dir in os.listdir(dataset_dir)[:10]:
-        specification = None
-        flag = True
-        for file in os.listdir(os.path.join(dataset_dir, dir)):
-            if file == "buggy_programs":
-                if not os.path.exists(os.path.join(dataset_dir, dir, file, "python")):
-                    flag = False
-                    break
+    dataset_code_dir = "./Datasets/TrickyBugs/PUT_python"
+    specification_dir = "./Datasets/TrickyBugs/problem_descriptions"
 
-            if "problem_description" in file:
-                with open(os.path.join(dataset_dir, dir, file), 'r', encoding="utf-8") as f:
-                    specification = f.read()
-                    f.close()
-                break
-        if flag is False:
-            continue
+    for dir in os.listdir(dataset_code_dir)[:5]:
+        file_name = os.listdir(os.path.join(dataset_code_dir , dir))[0].split(".")[0]
+        print(file_name)
+
+        with open(os.path.join(specification_dir , dir , "problem_description.txt") , 'r' , encoding="utf-8") as f:
+            specification = f.read()
+            f.close()
+
         assert specification is not None
 
         response = generate_input_by_model(model, tokenizer, specification, pid, temperature, max_new_token)
 
-        test_generator_dir = f"./TrickyBugs/{model_name}/GenInputs/tc_generator_python"
+        test_generator_dir = f"./TrickyBugs/{model}/GenInputs/tc_generator_python"
 
-        result_path = os.path.join(test_generator_dir, dir)
-        if not os.path.exists(result_path):
-            os.makedirs(result_path, exist_ok=True)
+        result_path = os.path.join(test_generator_dir , dir)
+        os.makedirs(result_path , exist_ok=True)
 
-        test_input_dir = os.path.join(f"./TrickyBugs/{model_name}/GenInputs/tc_inputs_generator", dir)
+        test_input_dir = os.path.join(f"./TrickyBugs/{model}/GenInputs/tc_inputs_generator" , dir)
 
         if not os.path.exists(test_input_dir):
-            os.makedirs(test_input_dir, exist_ok=True)
-
-        with open(os.path.join(result_path, dir + "_test_generator"), 'w', encoding='utf-8') as f:
+            os.makedirs(test_input_dir , exist_ok=True)
+        
+        with open(os.path.join(result_path ,  file_name + "_test_generator") , 'w' , encoding='utf-8') as f:
             f.write(response)
             f.close()
-
 
 def extract_test_generator_for_model(model_name):
     input_folder = f"./TrickyBugs/{model_name}/GenInputs/tc_generator_python"
@@ -390,7 +371,7 @@ def extract_test_generator_for_model(model_name):
                 f.close()
 
 
-def execute_input_generator_for_model(model_name):
+def execute_input_generator_by_model(model_name):
     generator_dir = f"./TrickyBugs/{model_name}/GenInputs/tc_generator_python_extracted"
     for dir in os.listdir(generator_dir):
         for python_file in os.listdir(os.path.join(generator_dir, dir)):
@@ -428,77 +409,65 @@ def get_result_for_input(result_list: dict):
 def execute_test_for_TrickyBugs(model: str):
     test_inputs_dir = f"./TrickyBugs/{model}/GenInputs/tc_inputs_generator"
     code_path = f"./TrickyBugs/{model}/GenProgs/tc_generate_code_python_extracted"
-    put_path = f"./Datasets/TrickyBugs"
+    put_path = f"./Datasets/TrickyBugs/PUT_python"
+    fixed_path = f"./Datasets/TrickyBugs/fixed_programs"
 
+    total_generate_input = 0
     total_test_input = 0
     total_valid_input = 0
     total_failure_inducing_input = 0
     total_invalid_input = 0
 
     for dir in os.listdir(code_path):
-        code_file_dir = os.path.join(code_path, dir)
-        test_file_dir = os.path.join(test_inputs_dir, dir)
+        code_file_dir = os.path.join(code_path , dir)
+        test_file_dir = os.path.join(test_inputs_dir , dir)
         code_file_path_list = []
 
         for code_file in os.listdir(code_file_dir):
-            code_file_path = os.path.join(code_file_dir, code_file)
+            code_file_path = os.path.join(code_file_dir , code_file)
             code_file_path_list.append(code_file_path)
 
         for test_file in os.listdir(test_file_dir):
-            test_file_path = os.path.join(test_file_dir, test_file)
+            total_generate_input += 1
+            test_file_path = os.path.join(test_file_dir , test_file)
             print(test_file_path)
-            with open(test_file_path, 'r', encoding='utf-8') as f:
+            with open(test_file_path , 'r' , encoding='utf-8') as f:
                 test_input = f.read()
 
             if test_input.strip("\n") == "":
                 continue
 
-            put_dir = os.path.join(put_path, dir, "buggy_programs", "python")
+            put_dir = os.path.join(put_path , dir)
 
-            fixed_code_dir = os.path.join(put_path, dir, "fixed_programs", "python")
-            if not os.path.exists(fixed_code_dir):
-                fixed_code_dir = None
-
-            if fixed_code_dir is not None:
-                fixed_code_file = os.path.join(fixed_code_dir, os.listdir(fixed_code_dir)[0])
-
+            fixed_code_dir = os.path.join(fixed_path , dir)
+            fixed_code_file = os.path.join(fixed_code_dir , os.listdir(fixed_code_dir)[0])
+            
             result_list = {}
+
             for code_file_path in code_file_path_list:
                 try:
-                    result = subprocess.run(["python", code_file_path], input=test_input, capture_output=True,
-                                            text=True, timeout=10)
+                    result = subprocess.run(["python" , code_file_path] , input=test_input , capture_output=True,
+                                            text=True , timeout=10)
                     if result.returncode != 0:
                         continue
                 except subprocess.TimeoutExpired:
                     continue
-
+                    
                 result_output = result.stdout
-                result_list[result_output] = result_list.get(result_output, 0) + 1
-
+                result_list[result_output] = result_list.get(result_output , 0) + 1
+        
             for put_code in os.listdir(put_dir):
                 flag = True
 
-                put_code_path = os.path.join(put_dir, put_code)
+                put_code_path = os.path.join(put_dir , put_code)
                 try:
-                    result_put = subprocess.run(["python", put_code_path], input=test_input, capture_output=True,
-                                                text=True, timeout=10)
-                except subprocess.TimeoutExpired:
-                    continue
-
+                    result_put = subprocess.run(["python" , put_code_path] , input=test_input , capture_output=True,
+                                            text=True , timeout=10)
+                except:
+                    flag = False
+                
                 if result_put.returncode != 0:
                     flag = False
-
-                # for code_file_path in code_file_path_list:
-                #     try:
-                #         result = subprocess.run(["python" , code_file_path] , input=test_input , capture_output=True,
-                #                                 text=True , timeout=10)
-                #         if result.returncode != 0:
-                #             continue
-                #     except subprocess.TimeoutExpired:
-                #         continue
-
-                #     result_output = result.stdout
-                #     result_list[result_output] = result_list.get(result_output , 0) + 1
 
                 final_result = None
 
@@ -511,50 +480,44 @@ def execute_test_for_TrickyBugs(model: str):
                 elif flag is True and len(result_list) > 1:
                     final_result = get_result_for_input(result_list)
                 elif flag is False and len(result_list) != 0:
-                    final_result = get_result_for_input(result_list)
+                    final_result = get_result_for_input(result_list) 
 
-                if fixed_code_file is not None:
-                    if final_result is not None and final_result != "No valid output":
-                        total_test_input += 1
+                if final_result is not None and final_result != "No valid output":
+                    total_test_input += 1
+                    
+                    try:
+                        fixed_code_result = subprocess.run(["python" , fixed_code_file] , input=test_input , capture_output=True,
+                                                            text=True , timeout=10)
+                    except:
+                        total_invalid_input += 1
+                        continue
+                        
+                    if fixed_code_result.returncode != 0:
+                        total_invalid_input += 1
+                        continue
 
-                        try:
-                            fixed_code_result = subprocess.run(["python", fixed_code_file], input=test_input,
-                                                               capture_output=True,
-                                                               text=True, timeout=10)
-                        except subprocess.TimeoutExpired:
-                            total_invalid_input += 1
-                            continue
-
-                        if fixed_code_result.returncode != 0:
-                            total_invalid_input += 1
-                            continue
-
-                        if fixed_code_result.stdout != final_result:
-                            total_invalid_input += 1
-                        elif fixed_code_result.stdout == final_result:
-                            total_valid_input += 1
-                            if result_put.returncode != 0 or result_put.stdout != final_result:
-                                total_failure_inducing_input += 1
-                                failure_inducing_dir_path = os.path.join(
-                                    f"./TrickyBugs/{model}/GenInputs/tc_failure_inducing_output", dir)
-                                os.makedirs(failure_inducing_dir_path, exist_ok=True)
-                                with open(os.path.join(failure_inducing_dir_path,
-                                                       put_code.split(".")[0] + "_" + test_file.split(".")[0] + ".out"),
-                                          'w', encoding='utf-8') as f:
-                                    f.write(str(final_result))
-
-                            result_dir_path = os.path.join(f"./TrickyBugs/{model}/GenInputs/tc_valid_output", dir)
-                            os.makedirs(result_dir_path, exist_ok=True)
-                            result_file_path = os.path.join(result_dir_path,
-                                                            put_code.split(".")[0] + "_" + test_file.split(".")[
-                                                                0] + ".out")
-                            with open(result_file_path, 'w', encoding='utf-8') as f:
+                    
+                    if fixed_code_result.stdout != final_result:
+                        total_invalid_input += 1
+                    elif fixed_code_result.stdout == final_result:
+                        total_valid_input += 1
+                        if result_put.returncode != 0 or result_put.stdout != final_result:
+                            total_failure_inducing_input += 1
+                            failure_inducing_dir_path = os.path.join(f"./TrickyBugs/{model}/GenInputs/tc_failure_inducing_output" , dir)
+                            os.makedirs(failure_inducing_dir_path , exist_ok=True)
+                            with open(os.path.join(failure_inducing_dir_path , put_code.split(".")[0] + "_" + test_file.split(".")[0] + ".out") , 'w' , encoding='utf-8') as f:
                                 f.write(str(final_result))
 
-    if not os.path.exists(f"./TrickyBugs_results/{model}"):
-        os.makedirs(f"./TrickyBugs_results/{model}", exist_ok=True)
+                        result_dir_path = os.path.join(f"./TrickyBugs/{model}/GenInputs/tc_valid_output" , dir)
+                        os.makedirs(result_dir_path , exist_ok=True)
+                        result_file_path = os.path.join(result_dir_path , put_code.split(".")[0] + "_" + test_file.split(".")[0] + ".out")
+                        with open(result_file_path , 'w' , encoding='utf-8') as f:
+                            f.write(str(final_result))
 
-    with open(f"./TrickyBugs_results/{model}/result_TrickyBugs.txt", 'w', encoding='utf-8') as f:
+    os.makedirs(f"./TrickyBugs_results/{model}" , exist_ok=True)
+    
+    with open(f"./TrickyBugs_results/{model}/result_TrickyBugs.txt" , 'w' , encoding='utf-8') as f:
+        f.write(f"Total generate input: {total_generate_input}\n")
         f.write(f"Total test input: {total_test_input}\n")
         f.write(f"Total valid input: {total_valid_input}\n")
         f.write(f"Total invalid input: {total_invalid_input}\n")
@@ -568,52 +531,75 @@ def execute_test_for_TrickyBugs(model: str):
             f.write(f"Ratio of valid test input: 0\n")
             f.write(f"Ratio of invalid test input: 0\n")
 
+def count_effective_lines(filename):
+    count = 0
+    with open(filename, encoding='utf-8') as f:
+        for line in f:
+            line_strip = line.strip()
+            if not line_strip or line_strip.startswith('#'):
+                continue
+            count += 1
+    return count
 
 def calculate_the_coverage(model: str):
     valid_input_dir = f"./TrickyBugs/{model}/GenInputs/tc_valid_output"
     inputs_generator_dir = f"./TrickyBugs/{model}/GenInputs/tc_inputs_generator"
     dataset_path = f"./Datasets/TrickyBugs"
+    put_dir = f"./Datasets/TrickyBugs/PUT_python"
 
     total_line = 0
     total_missing = 0
 
-    for dir in os.listdir(valid_input_dir):
-        report_dir = f"./coverage/TrickyBugs/{dir}/"
-        os.makedirs(report_dir, exist_ok=True)
-        buggy_code_dir = os.path.join(dataset_path, dir, "buggy_programs", "python")
-        for buggy_code_file in os.listdir(buggy_code_dir):
-            buggy_code_path = os.path.join(buggy_code_dir, buggy_code_file)
+    for dir in os.listdir(put_dir)[:5]:
+        report_dir = f"./coverage/TrickyBugs/{model}/{dir}"
+        os.makedirs(report_dir , exist_ok=True)
 
-            test_output_dir = os.path.join(valid_input_dir, dir)
-            for test_output_file in os.listdir(test_output_dir):
-                name_list = test_output_file.split(".")[0].split("_")
-                # print(name_list)
-                input_file = os.path.join(inputs_generator_dir, dir, "_".join(name_list[2:]) + ".in")
-                print(input_file)
-                with open(input_file, 'r', encoding='utf-8') as f:
-                    input_text = f.read().strip("\n")
+        valid_output_path = os.path.join(valid_input_dir , dir)
+        if not os.path.exists(valid_output_path):
+            code_dir = os.path.join(put_dir , dir)
+            code_file = os.path.join(code_dir , os.listdir(code_dir)[0])
+            line_num = count_effective_lines(code_file)
+            total_line += line_num
+            total_missing += line_num
+            with open(os.path.join(report_dir , os.listdir(code_dir)[0].split('.')[0] + "_coverage_report.txt") , 'w' , encoding='utf-8') as f:
+                f.write("no valid input\n")
+            continue
+        else:
+            buggy_code_dir = os.path.join(put_dir , dir)
 
-                subprocess.run(
-                    ["coverage", "run", "--parallel-mode", buggy_code_path],
-                    input=input_text,
-                    text=True,
-                    capture_output=True
-                )
+            for buggy_code_file in os.listdir(buggy_code_dir):
+                buggy_code_path = os.path.join(buggy_code_dir , buggy_code_file)
 
-            cov = coverage.Coverage()
-            cov.combine()
-            analysis = cov.analysis(buggy_code_path)
-            total_line += len(analysis[1])
-            total_missing += len(analysis[2])
-            coverage_report_file = os.path.join(report_dir, f"{buggy_code_file.split('.')[0]}_coverage_report.txt")
-            with open(coverage_report_file, 'w', encoding='utf-8') as report_file:
-                cov.report(file=report_file)
-                report_file.write(f"\n{analysis[2]}")
+                test_output_dir = os.path.join(valid_input_dir , dir)
+                for test_output_file in os.listdir(test_output_dir):
+                    name_list = test_output_file.split(".")[0].split("_")
+                    # print(name_list)
+                    input_file = os.path.join(inputs_generator_dir , dir , "_".join(name_list[1:]) + ".in")
+                    print(input_file)
+                    with open(input_file , 'r' , encoding='utf-8') as f:
+                        input_text = f.read().strip("\n")
+                    
+                    subprocess.run(
+                        ["coverage" , "run" , "--parallel-mode" , buggy_code_path],
+                        input=input_text,
+                        text=True,
+                        capture_output=True
+                    )
 
-    with open(f"./coverage/TrickyBugs/{model}/total_coverage.txt", 'w', encoding='utf-8') as f:
+                cov = coverage.Coverage()
+                cov.combine()
+                analysis = cov.analysis(buggy_code_path)
+                total_line += len(analysis[1])
+                total_missing += len(analysis[2])
+                coverage_report_file = os.path.join(report_dir , f"{buggy_code_file.split('.')[0]}_coverage_report.txt")
+                with open(coverage_report_file, 'w' , encoding='utf-8') as report_file:
+                    cov.report(file=report_file)
+                    report_file.write(f"\n{analysis[2]}")
+
+    with open(f"./coverage/TrickyBugs/{model}/total_coverage.txt" , 'w' , encoding='utf-8') as f:
         f.write(f"Total line: {total_line}\n")
         f.write(f"Total missing: {total_missing}\n")
-        f.write(f"Coverage: {(total_line - total_missing) / total_line : .4f}\n")
+        f.write(f"Coverage: {(total_line -total_missing) / total_line : .4f}\n")
 
 
 if __name__ == '__main__':

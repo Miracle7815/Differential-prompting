@@ -288,39 +288,32 @@ def parse_and_generate_test(client , model:str , mode):
                 try_num += 1
 
 def parse_and_generate_test_for_TrickyBugs(client , model: str):
-    dataset_dir = "./Datasets/TrickyBugs"
     pid = os.getpid()
-    for dir in os.listdir(dataset_dir)[:10]:
-        specification = None
-        flag = True
-        for file in os.listdir(os.path.join(dataset_dir , dir)):
-            if file == "buggy_programs":
-                if not os.path.exists(os.path.join(dataset_dir , dir , file , "python")):
-                    flag = False
-                    break
+    dataset_code_dir = "./Datasets/TrickyBugs/PUT_python"
+    specification_dir = "./Datasets/TrickyBugs/problem_descriptions"
 
-            if "problem_description" in file:
-                with open(os.path.join(dataset_dir , dir , file) , 'r' , encoding="utf-8") as f:
-                    specification = f.read()
-                    f.close()
-                break
-        if flag is False:
-            continue
+    for dir in os.listdir(dataset_code_dir):
+        file_name = os.listdir(os.path.join(dataset_code_dir , dir))[0].split(".")[0]
+        print(file_name)
+
+        with open(os.path.join(specification_dir , dir , "problem_description.txt") , 'r' , encoding="utf-8") as f:
+            specification = f.read()
+            f.close()
+
         assert specification is not None
         token_info , response = generate_input_for_TrickyBugs(client , specification , pid, model)
 
         test_generator_dir = f"./TrickyBugs/{model}/GenInputs/tc_generator_python"
 
         result_path = os.path.join(test_generator_dir , dir)
-        if not os.path.exists(result_path):
-            os.makedirs(result_path , exist_ok=True)
+        os.makedirs(result_path , exist_ok=True)
 
         test_input_dir = os.path.join(f"./TrickyBugs/{model}/GenInputs/tc_inputs_generator" , dir)
 
         if not os.path.exists(test_input_dir):
             os.makedirs(test_input_dir , exist_ok=True)
-
-        with open(os.path.join(result_path , dir + "_test_generator") , 'w' , encoding='utf-8') as f:
+        
+        with open(os.path.join(result_path ,  file_name + "_test_generator") , 'w' , encoding='utf-8') as f:
             f.write(response)
             f.close()
         
@@ -378,6 +371,9 @@ def extract_test_generator(model: str):
                 code = "\n".join(code_line)
             else:
                 code = content
+
+            if not "import random" in code:
+                code = "import random\n" + code
             
             extract_path = f"./TrickyBugs/{model}/GenInputs/tc_generator_python_extracted"
             os.makedirs(os.path.join(extract_path , dir) , exist_ok=True)
@@ -396,7 +392,7 @@ def execute_input_generator(model: str):
             if python_file.endswith(".py"):
                 python_file_path = os.path.join(".." , '..' , 'tc_generator_python_extracted' , dir , python_file)
                 try:
-                    exe_result = subprocess.run(["python" , python_file_path] , cwd=os.path.join(f"./TrickyBugs/{model}/GenInputs/tc_inputs_generator" , dir) , capture_output=True , text=True)
+                    exe_result = subprocess.run(["python" , python_file_path] , cwd=os.path.join(f"./TrickyBugs/{model}/GenInputs/tc_inputs_generator" , dir) , capture_output=True , text=True , timeout=5)
                     if exe_result.returncode != 0:
                         print(f'Error in {os.path.join(generator_dir , dir , python_file)}: {exe_result.stderr}')
                         continue
