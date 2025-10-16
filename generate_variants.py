@@ -202,7 +202,7 @@ def parse_and_generate_variants_for_TrickyBugs(client , model: str , k=2 , tempe
     dataset_code_path = os.path.join(dataset_path , "PUT_python")
     description_path = os.path.join(dataset_path , "problem_descriptions")
 
-    for dir in os.listdir(os.path.join(dataset_code_path)):
+    for dir in os.listdir(dataset_code_path):
         problem_description = None
         put_code = None
 

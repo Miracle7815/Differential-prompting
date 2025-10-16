@@ -400,7 +400,7 @@ def calculate_the_coverage(model: str):
 
 if __name__ == "__main__":
     # execute_test("gpt-3.5-turbo-1106")
-    # execute_test_for_TrickyBugs("gpt-4o-mini")
+    execute_test_for_TrickyBugs("gpt-4o-mini")
     calculate_the_coverage("gpt-4o-mini")
 
     # execute_test_for_TrickyBugs("Qwen/Qwen2.5-0.5B-Instruct")
