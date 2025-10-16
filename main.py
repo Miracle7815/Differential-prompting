@@ -8,7 +8,8 @@ API_KEY = 'sk-YXeIf5Hzq452SluTP77QPGWOeWHq7GFMqH4C4kwr9uFZhbhv'
 
 client = OpenAI(base_url=BASE_URL , api_key=API_KEY)
 
-model_name = "gpt-4o-mini"
+# model_name = "gpt-4o-mini"
+model_name = "gpt-3.5-turbo-1106"
 
 generate_variants.parse_and_generate_variants_for_TrickyBugs(client , model=model_name , k=6 , temperature=0.8)
 generate_variants.transform_code_for_TrickyBugs(model_name)

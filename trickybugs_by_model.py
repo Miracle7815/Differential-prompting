@@ -8,11 +8,11 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 import subprocess
 import torch
 import coverage
-from vllm import LLM, SamplingParams
+# from vllm import LLM, SamplingParams
 
 os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 # os.environ["CUDA_VISIBLE_DEVICES"] = "7,8,9,10,11,12,13,14"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0 , 1 , 2 , 3 , 4 , 5 , 6"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0 , 1 , 2 , 3 , 4 , 5 , 6"
 
 
 def load_model(model_name):
@@ -29,53 +29,53 @@ def load_model(model_name):
     return model, tokenizer
 
 
-def load_model_vllm(model_name):
-    model_name = f"../{model_name}"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+# def load_model_vllm(model_name):
+#     model_name = f"../{model_name}"
+#     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
-    sampling_params = SamplingParams(temperature=0.8, max_tokens=1024)
-    model = LLM(model=model_name, tensor_parallel_size=4)
+#     sampling_params = SamplingParams(temperature=0.8, max_tokens=1024)
+#     model = LLM(model=model_name, tensor_parallel_size=4)
 
-    return model, sampling_params, tokenizer
+#     return model, sampling_params, tokenizer
 
 
-def generate_variants_by_model_vllm(problem_description, put_code, model, sampling_params, tokenizer, k=2):
-    system_prompt = """You are a professional coding competition participant, skilled at identifying bugs and logic flaws in code.
-You will receive a description of a coding problem, and a piece of code attempting to solve the problem.
-Your task is to find whether there is any bug or logic flaw in the code, if any, please repair code.
-Please reply with ONLY the COMPLETE REPAIRED CODE (rather than code fragments) and DO NOT reply any other content.
-"""
-    user_prompt = """**PROBLEM DESCRIPTION**:
-"""
-    user_prompt += problem_description + "\n"
-    user_prompt += """
-**CODE**:
-"""
-    user_prompt += put_code
-    # print(user_prompt)
+# def generate_variants_by_model_vllm(problem_description, put_code, model, sampling_params, tokenizer, k=2):
+#     system_prompt = """You are a professional coding competition participant, skilled at identifying bugs and logic flaws in code.
+# You will receive a description of a coding problem, and a piece of code attempting to solve the problem.
+# Your task is to find whether there is any bug or logic flaw in the code, if any, please repair code.
+# Please reply with ONLY the COMPLETE REPAIRED CODE (rather than code fragments) and DO NOT reply any other content.
+# """
+#     user_prompt = """**PROBLEM DESCRIPTION**:
+# """
+#     user_prompt += problem_description + "\n"
+#     user_prompt += """
+# **CODE**:
+# """
+#     user_prompt += put_code
+#     # print(user_prompt)
 
-    messages = [
-        {'role': "system", "content": system_prompt},
-        {'role': "user", "content": user_prompt}
-    ]
+#     messages = [
+#         {'role': "system", "content": system_prompt},
+#         {'role': "user", "content": user_prompt}
+#     ]
 
-    prompt = tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True
-    )
+#     prompt = tokenizer.apply_chat_template(
+#         messages,
+#         tokenize=False,
+#         add_generation_prompt=True
+#     )
 
-    model_responses_list = []
+#     model_responses_list = []
 
-    for i in range(k):
-        output = model.generate(prompt, sampling_params)
-        code = output.outputs[0].text
+#     for i in range(k):
+#         output = model.generate(prompt, sampling_params)
+#         code = output.outputs[0].text
 
-        print(code)
+#         print(code)
 
-        model_responses_list.append(code)
+#         model_responses_list.append(code)
 
-    return model_responses_list
+#     return model_responses_list
 
 
 def generate_variants_by_model(problem_description, put_code, model, tokenizer, k=2, temperature=0.8,
@@ -129,33 +129,33 @@ Please reply with ONLY the COMPLETE REPAIRED CODE (rather than code fragments) a
     return model_responses_list
 
 
-def parse_and_generate_variants_for_TrickyBugs_by_model_vllm(model, tokenizer, sampling_params, model_name, k=6):
-    dataset_path = "./Datasets/TrickyBugs"
-    dataset_code_path = os.path.join(dataset_path , "PUT_python")
-    description_path = os.path.join(dataset_path , "problem_descriptions")
+# def parse_and_generate_variants_for_TrickyBugs_by_model_vllm(model, tokenizer, sampling_params, model_name, k=6):
+#     dataset_path = "./Datasets/TrickyBugs"
+#     dataset_code_path = os.path.join(dataset_path , "PUT_python")
+#     description_path = os.path.join(dataset_path , "problem_descriptions")
 
-    for dir in os.listdir(os.path.join(dataset_code_path))[:10]:
-        problem_description = None
-        put_code = None
+#     for dir in os.listdir(os.path.join(dataset_code_path))[:10]:
+#         problem_description = None
+#         put_code = None
 
-        with open(os.path.join(description_path , dir , "problem_description.txt") , 'r' , encoding='utf-8') as f:
-            problem_description = f.read()
-            f.close()
+#         with open(os.path.join(description_path , dir , "problem_description.txt") , 'r' , encoding='utf-8') as f:
+#             problem_description = f.read()
+#             f.close()
         
-        for file in os.listdir(os.path.join(dataset_code_path , dir)):
-            print(file)
-            with open(os.path.join(dataset_code_path , dir , file) , 'r' , encoding='utf-8') as f:
-                put_code = f.read()
-                f.close()
+#         for file in os.listdir(os.path.join(dataset_code_path , dir)):
+#             print(file)
+#             with open(os.path.join(dataset_code_path , dir , file) , 'r' , encoding='utf-8') as f:
+#                 put_code = f.read()
+#                 f.close()
                 
-            response_list = generate_variants_by_model_vllm(problem_description, put_code, model, sampling_params,
-                                                            tokenizer, k)
-            for idx, response in enumerate(response_list):
-                dir_name = f"./TrickyBugs/{model_name}/GenProgs/tc_generated_progs_python/{dir}"
-                if not os.path.exists(dir_name):
-                    os.makedirs(dir_name)
-                with open(os.path.join(dir_name , file.split(".")[0] + "_num_" + str(idx)) , "w" , encoding='utf-8') as resp_file:
-                    resp_file.write(response)
+#             response_list = generate_variants_by_model_vllm(problem_description, put_code, model, sampling_params,
+#                                                             tokenizer, k)
+#             for idx, response in enumerate(response_list):
+#                 dir_name = f"./TrickyBugs/{model_name}/GenProgs/tc_generated_progs_python/{dir}"
+#                 if not os.path.exists(dir_name):
+#                     os.makedirs(dir_name)
+#                 with open(os.path.join(dir_name , file.split(".")[0] + "_num_" + str(idx)) , "w" , encoding='utf-8') as resp_file:
+#                     resp_file.write(response)
 
 
 def parse_and_generate_variants_for_TrickyBugs_by_model(model, tokenizer, model_name, k=6, temperature=0.8,
@@ -164,7 +164,7 @@ def parse_and_generate_variants_for_TrickyBugs_by_model(model, tokenizer, model_
     dataset_code_path = os.path.join(dataset_path , "PUT_python")
     description_path = os.path.join(dataset_path , "problem_descriptions")
 
-    for dir in os.listdir(os.path.join(dataset_code_path))[:10]:
+    for dir in os.listdir(os.path.join(dataset_code_path)):
         problem_description = None
         put_code = None
 
