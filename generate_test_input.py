@@ -384,7 +384,7 @@ def extract_test_generator(model: str):
 
 def execute_input_generator(model: str):
     generator_dir = f"./TrickyBugs/{model}/GenInputs/tc_generator_python_extracted"
-    for dir in os.listdir(generator_dir):
+    for dir in os.listdir(generator_dir)[:1]:
         for python_file in os.listdir(os.path.join(generator_dir , dir)):
             # with open(os.path.join(generator_dir , dir , python_file) , 'r' , encoding='utf-8') as f:
             #     code = f.read()
@@ -419,8 +419,12 @@ if __name__ == "__main__":
 
     # parse_and_generate_test_for_TrickyBugs(client , "gpt-3.5-turbo-1106")
     # extract_test_generator("gpt-3.5-turbo-1106")
-    
-    parse_and_generate_test_for_TrickyBugs(client , "gpt-4o-mini")
-    extract_test_generator("gpt-4o-mini")
 
-    execute_input_generator("gpt-4o-mini")
+    parse_and_generate_test_for_TrickyBugs(client , "gpt-3.5-turbo-1106")
+    extract_test_generator("gpt-3.5-turbo-1106")
+    execute_input_generator("gpt-3.5-turbo-1106")
+    
+    # parse_and_generate_test_for_TrickyBugs(client , "gpt-4o-mini")
+    # extract_test_generator("gpt-4o-mini")
+
+    # execute_input_generator("gpt-4o-mini")

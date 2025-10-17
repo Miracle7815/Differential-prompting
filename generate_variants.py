@@ -364,8 +364,10 @@ if __name__ == '__main__':
 
     client = OpenAI(base_url=BASE_URL , api_key=API_KEY)
 
-    parse_and_generate_variants_for_TrickyBugs(client , model="gpt-4o-mini" , k=6 , temperature=0.8)
-    transform_code_for_TrickyBugs("gpt-4o-mini")
+    parse_and_generate_variants_for_TrickyBugs(client , model="gpt-3.5-turbo-1106" , k=6 , temperature=0.8)
+
+    # parse_and_generate_variants_for_TrickyBugs(client , model="gpt-4o-mini" , k=6 , temperature=0.8)
+    # transform_code_for_TrickyBugs("gpt-4o-mini")
 
     # parse_and_generate_variants_for_TrickyBugs(client , model="gpt-3.5-turbo-1106")
     # transform_code_for_TrickyBugs("gpt-3.5-turbo-1106")
