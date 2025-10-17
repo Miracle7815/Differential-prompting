@@ -399,11 +399,11 @@ def calculate_the_coverage(model: str):
         f.write(f"Coverage: {(total_line -total_missing) / total_line : .4f}\n")
 
 if __name__ == "__main__":
-    execute_test_for_TrickyBugs("gpt-3.5-turbo-1106")
-    calculate_the_coverage("gpt-3.5-turbo-1106")
+    # execute_test_for_TrickyBugs("gpt-3.5-turbo-1106")
+    # calculate_the_coverage("gpt-3.5-turbo-1106")
 
-    # execute_test_for_TrickyBugs("gpt-4o-mini")
-    # calculate_the_coverage("gpt-4o-mini")
+    execute_test_for_TrickyBugs("gpt-4o-mini")
+    calculate_the_coverage("gpt-4o-mini")
 
     # execute_test_for_TrickyBugs("Qwen/Qwen2.5-0.5B-Instruct")
     # calculate_the_coverage("Qwen/Qwen2.5-0.5B-Instruct")

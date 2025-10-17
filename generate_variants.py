@@ -139,6 +139,44 @@ Please reply with ONLY the COMPLETE REPAIRED CODE (rather than code fragments) a
 
     return token_info_list , model_responses_list
 
+def generate_variants_for_EvalPlus(client , prompt , model , k=2 , temperature=0.8):
+    system_prompt = """**INSTRCUTION**:
+You are a professional developer, skilled at identifying bugs and logic flaws in code.
+You will receive a Python function, and the comments below the function signature is the docstring that specifies the requirement of the function.
+Please carefully check if the function has correctly implemented the requirements of the docstring. if there is any bug in the existing code, please reply a repaired correct implementation.
+Please reply with ONLY the whole completed function code without any other content.
+"""
+    user_prompt = """**Function and Docstring**:
+"""
+    user_prompt += prompt
+
+    messages = [
+        {'role': 'system' , 'content': system_prompt},
+        {'role': 'user' , 'content': user_prompt}
+    ]
+
+    model_responses_list = []
+    token_info_list = []
+
+    for idx in range(k):
+        token_info = check_prompt_fit(messages , model)
+        if token_info['fits'] is False:
+            token_info_list.append(token_info)
+            model_responses_list.append("The length of context is out of bound !!!")
+            continue
+            
+        response = client.chat.completions.create(
+            messages=messages,
+            model=model,
+            temperature=temperature
+        )
+
+        token_info_list.append(token_info)
+        model_responses_list.append(response.choices[0].message.content)
+        time.sleep(1)
+
+    return token_info_list , model_responses_list
+
 def parse_and_generate_variants(model: str , mode , temperature=0.3):
     folder_path = './Infer intention'
     for file in os.listdir(folder_path):
@@ -223,6 +261,23 @@ def parse_and_generate_variants_for_TrickyBugs(client , model: str , k=2 , tempe
                 if not os.path.exists(dir_name):
                     os.makedirs(dir_name)
                 with open(os.path.join(dir_name , file.split(".")[0] + "_num_" + str(idx)) , "w" , encoding='utf-8') as resp_file:
+                    resp_file.write(response)
+
+def parse_and_generate_variant_for_EvalPlus(client , model: str , k=6 , temperature=0.3):
+    dataset_path = "./Datasets/EvalPlus"
+    dataset_code_path = os.path.join(dataset_path , "PUTs")
+    
+    for dir in os.listdir(dataset_code_path)[:5]:
+        print(dir)
+        with open(os.path.join(dataset_code_path , dir , 'put0.py') , 'r' , encoding='utf-8') as f:
+            put_code = f.read()
+        
+        token_info_list , response_list = generate_variants_for_EvalPlus(client , put_code , model , k=k , temperature=temperature)
+        for idx , response in enumerate(response_list):
+                dir_name = f"./EvalPlus/{model}/GenProgs/tc_generated_progs_python/{dir}"
+                if not os.path.exists(dir_name):
+                    os.makedirs(dir_name)
+                with open(os.path.join(dir_name , "num_" + str(idx)) , "w" , encoding='utf-8') as resp_file:
                     resp_file.write(response)
 
 def transform_code(model: str):
@@ -340,6 +395,33 @@ def transform_code_for_TrickyBugs(model: str):
             with open(os.path.join(code_dir , file + ".py") , 'w' , encoding='utf-8') as f:
                 f.write(code)
 
+def transform_code_for_EvalPlus(model_name: str):
+    response_dir = f"./EvalPlus/{model_name}/GenProgs"
+    for dir in os.listdir(os.path.join(response_dir , "tc_generated_progs_python")):
+        code_dir = os.path.join(response_dir , "tc_generate_code_python_extracted" , dir)
+        for file in os.listdir(os.path.join(response_dir ,"tc_generated_progs_python" , dir)):
+            with open(os.path.join(response_dir , "tc_generated_progs_python" , dir , file) , 'r' , encoding='utf-8') as f:
+                content = f.read()
+            if "```python" in content:
+                content_list = content.split('\n')
+                flag = False
+                code_line = []
+                for line in content_list:
+                    if "```python" in line and flag is False:
+                        flag = True
+                    elif flag is True and "```" in line:
+                        break
+                    else:
+                        code_line.append(line)
+
+                code = "\n".join(code_line)
+            else:
+                code = content
+            
+            os.makedirs(os.path.join(code_dir) , exist_ok=True)
+            with open(os.path.join(code_dir , file + ".py") , 'w' , encoding='utf-8') as f:
+                f.write(code)
+
 
 if __name__ == '__main__':
     # logging.basicConfig(
@@ -364,14 +446,19 @@ if __name__ == '__main__':
 
     client = OpenAI(base_url=BASE_URL , api_key=API_KEY)
 
-    parse_and_generate_variants_for_TrickyBugs(client , model="gpt-3.5-turbo-1106" , k=6 , temperature=0.8)
+    # dataset_name = "TrickyBugs"
+    dataset_name = "EvalPlus"
 
-    # parse_and_generate_variants_for_TrickyBugs(client , model="gpt-4o-mini" , k=6 , temperature=0.8)
-    # transform_code_for_TrickyBugs("gpt-4o-mini")
+    model_name = "gpt-4o-mini"
+    # model_name = "gpt-3.5-turbo-1106"
 
-    # parse_and_generate_variants_for_TrickyBugs(client , model="gpt-3.5-turbo-1106")
-    # transform_code_for_TrickyBugs("gpt-3.5-turbo-1106")
+    if dataset_name == "TrickyBugs":
+        parse_and_generate_variants_for_TrickyBugs(client , model=model_name , k=6 , temperature=0.8)
+        transform_code_for_TrickyBugs(model_name)
 
+    elif dataset_name == "EvalPlus":
+        parse_and_generate_variant_for_EvalPlus(client , model_name , k = 6 , temperature=0.8)
+        transform_code_for_EvalPlus(model_name)
 
     # model_name = "Qwen/Qwen2.5-0.5B-Instruct"
     # model , tokenizer = load_model(model_name)

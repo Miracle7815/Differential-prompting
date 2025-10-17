@@ -167,6 +167,91 @@ io.input_writeln(tree.to_str(output=Edge.unweighted_edge)) # Output the unweight
 
     return token_info , response.choices[0].message.content
 
+def generate_input_for_EvalPlus(client , put_code , model: str):
+    system_prompt = """**INSTRCUTION**:
+You are a professional software testing engineer. 
+You will get a Program Under Test (PUT), and the comments below the function signature is the docstring that specifies the requirement of the PUT.
+
+Please write an input generator in Python for generating test input for THE PUT (DO NOT generate outputs).
+The generator should be a single Python function named 'sample_one()' and return a list of input parameters for PUT.
+Each parameter of the generated inputs must adhere to the type and format according to the function signature of PUT. And the format of return value should be list of parameters and should NOT be dict.
+
+You can use the python library random to generate random float and int, for example:
+from random import *
+# Generate a random integer between 0 and 9
+random_number = randint(0, 9)
+# Generate a random floating-point number between -1.0 and 1.0
+random_float = uniform(-1.0, 1.0)
+
+You can use the python library cyaron to generate random string, for example:
+from cyaron import *
+ALPHABET_SMALL = string.ascii_lowercase
+ALPHABET_CAPITAL = string.ascii_uppercase
+ALPHABET = ALPHABET_SMALL + ALPHABET_CAPITAL
+NUMBERS = string.digits
+str = String.random(5) # Generate a random string with 5 letters consisting of lowercase letters
+str = String.random(10, charset=ALPHABET_SMALL) # Generate a random string with 10 letters consisting of lowercase letters
+str = String.random(10, charset=ALPHABET_CAPITAL) # Generate a random string with 10 letters consisting of uppercase letters
+str = String.random(10, charset=NUMBERS) # Generate a random string with 10 letters consisting of digits letters
+str = String.random(10, charset='#.') # Generate a random string with 10 letters consisting of '#' and '.'
+
+Please reply with ONLY the code of the input generator without any other content.
+
+**EXAMPLE**:
+Here is an example of how to write input generator:
+
+If the given function and docstring is like:
+```python
+def has_close_elements(numbers: List[float], threshold: float) -> bool:
+    \"\"\" Check if in given list of numbers, are any two numbers closer to each other than
+    given threshold.
+    >>> has_close_elements([1.0, 2.0, 3.0], 0.5)
+    False
+    >>> has_close_elements([1.0, 2.8, 3.0, 4.0, 5.0, 2.0], 0.3)
+    True
+    \"\"\"
+    for i in range(len(numbers)):
+        for j in range(i + 1, len(numbers)):
+            if abs(numbers[i] - numbers[j]) <= threshold:
+                return True
+    return False
+```
+
+Then your reply should be like the following content:
+```python
+from random import *
+from cyaron import *
+def sample_one():
+    numbers=[]
+    length_of_numbers=randint(0,10)
+    for i in range(length_of_numbers):
+      numbers.append(uniform(-5,5))
+    threshold=uniform(-10,10)
+    generated_input=[numbers,threshold]
+    return generated_input
+```
+"""
+    user_prompt = """**Function and Docstring**:
+"""
+    user_prompt += put_code
+
+    messages = [
+        {'role': 'system' , 'content' : system_prompt} , 
+        {'role': 'user' , 'content': user_prompt}
+    ]
+
+    token_info = check_prompt_fit(messages , model)
+    if token_info['fits'] is False:
+        return token_info , "The length of context is out of bound !!!"
+    
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=0.3
+    )
+
+    return token_info , response.choices[0].message.content
+
 def parse_and_generate_test(client , model:str , mode):
     PUT_folder_path = "./Code in dataset"
     specification_folder_path = "./Infer intention"
@@ -316,7 +401,34 @@ def parse_and_generate_test_for_TrickyBugs(client , model: str):
         with open(os.path.join(result_path ,  file_name + "_test_generator") , 'w' , encoding='utf-8') as f:
             f.write(response)
             f.close()
+
+def parse_and_generate_for_EvalPlus(client , model: str):
+    dataset_code_dir = "./Datasets/EvalPlus/PUTs"
+    
+    for dir in os.listdir(dataset_code_dir):
+        print(dir)
+
+        with open(os.path.join(dataset_code_dir , dir , "put0.py") , 'r' , encoding="utf-8") as f:
+            put_code = f.read()
+            f.close()
+
+        token_info , response = generate_input_for_TrickyBugs(client , put_code, model)
+
+        test_generator_dir = f"./TrickyBugs/{model}/GenInputs/tc_generator_python"
+
+        result_path = os.path.join(test_generator_dir , dir)
+        os.makedirs(result_path , exist_ok=True)
+
+        test_input_dir = os.path.join(f"./TrickyBugs/{model}/GenInputs/tc_inputs_generator" , dir)
+
+        # if not os.path.exists(test_input_dir):
+        #     os.makedirs(test_input_dir , exist_ok=True)
         
+        with open(os.path.join(result_path ,  dir + "_test_generator") , 'w' , encoding='utf-8') as f:
+            f.write(response)
+            f.close()
+        
+
 def extract_test_input(model: str , mode):
     if mode == 0:
         input_folder = "./Test input/my"
@@ -409,6 +521,12 @@ if __name__ == "__main__":
     )
     client = OpenAI(base_url=BASE_URL , api_key=API_KEY)
 
+    # dataset_name = "TrickyBugs"
+    dataset_name = 'EvalPlus'
+
+    model_name = "gpt-4o-mini"
+    # model_name = "gpt-3.5-turbo-1106"
+
     # modes = {'my' : 0 , 'essay': 1}
 
     # for _ , mode in modes.items():
@@ -420,11 +538,16 @@ if __name__ == "__main__":
     # parse_and_generate_test_for_TrickyBugs(client , "gpt-3.5-turbo-1106")
     # extract_test_generator("gpt-3.5-turbo-1106")
 
-    parse_and_generate_test_for_TrickyBugs(client , "gpt-3.5-turbo-1106")
-    extract_test_generator("gpt-3.5-turbo-1106")
-    execute_input_generator("gpt-3.5-turbo-1106")
+    # parse_and_generate_test_for_TrickyBugs(client , "gpt-3.5-turbo-1106")
+    # extract_test_generator("gpt-3.5-turbo-1106")
+    # execute_input_generator("gpt-3.5-turbo-1106")
     
-    # parse_and_generate_test_for_TrickyBugs(client , "gpt-4o-mini")
-    # extract_test_generator("gpt-4o-mini")
+    if dataset_name == "TrickyBugs":
+        parse_and_generate_test_for_TrickyBugs(client , model_name)
+        extract_test_generator(model_name)
 
-    # execute_input_generator("gpt-4o-mini")
+        execute_input_generator(model_name)
+
+    elif dataset_name == "EvalPlus":
+        parse_and_generate_for_EvalPlus(client , model_name)
+        
