@@ -8,15 +8,31 @@ API_KEY = 'sk-YXeIf5Hzq452SluTP77QPGWOeWHq7GFMqH4C4kwr9uFZhbhv'
 
 client = OpenAI(base_url=BASE_URL , api_key=API_KEY)
 
-model_name = "gpt-4o-mini"
-# model_name = "gpt-3.5-turbo-1106"
+# model_name = "gpt-4o-mini"
+model_name = "gpt-3.5-turbo-1106"
 
-generate_variants.parse_and_generate_variants_for_TrickyBugs(client , model=model_name , k=6 , temperature=0.8)
-generate_variants.transform_code_for_TrickyBugs(model_name)
+# mode = "dp"
+mode = "tc"
 
-generate_test_input.parse_and_generate_test_for_TrickyBugs(client , model_name)
-generate_test_input.extract_test_generator(model_name)
-generate_test_input.execute_input_generator(model_name)
+k_list = [2 , 4]
 
-execute_test.execute_test_for_TrickyBugs(model_name)
-execute_test.calculate_the_coverage(model_name)
+for k in k_list:
+    if mode == "tc":
+        generate_variants.parse_and_generate_variants_for_TrickyBugs(client , model=model_name , k=k , temperature=0.8)
+        generate_variants.transform_code_for_TrickyBugs(model_name , k)
+
+        generate_test_input.parse_and_generate_test_for_TrickyBugs(client , model_name , k)
+        generate_test_input.extract_test_generator_for_TrickyBugs(model_name , k)
+        generate_test_input.execute_input_generator(model_name , k)
+
+        execute_test.execute_test_for_TrickyBugs(model_name , k)
+        execute_test.calculate_the_coverage(model_name , k)
+    elif mode == "dp":
+        generate_variants.parse_and_generate_variant_for_TrickyBugs_DP(client , model_name , k=k , temperature=0.8)
+        generate_variants.transform_code_for_TrickyBugs_DP(model_name , k)
+
+        generate_test_input.parse_and_generate_test_for_TrickyBugs_DP(client , model_name , k)
+        generate_test_input.extract_test_input_for_TrickyBugs_DP(model_name , k)
+        
+        execute_test.execute_test_for_TrickyBugs_DP(model_name , k)
+        execute_test.calculate_the_coverage_for_DP(model_name , k)

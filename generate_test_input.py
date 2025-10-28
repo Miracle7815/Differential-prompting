@@ -3,6 +3,7 @@ from openai import OpenAI
 import logging
 from utils import *
 import subprocess
+import json
 
 BASE_URL = 'https://api.openai-proxy.org/v1'
 API_KEY = 'sk-YXeIf5Hzq452SluTP77QPGWOeWHq7GFMqH4C4kwr9uFZhbhv'
@@ -162,7 +163,7 @@ io.input_writeln(tree.to_str(output=Edge.unweighted_edge)) # Output the unweight
     response = client.chat.completions.create(
         model=model,
         messages=messages,
-        temperature=0.3
+        temperature=0.8
     )
 
     return token_info , response.choices[0].message.content
@@ -247,7 +248,111 @@ def sample_one():
     response = client.chat.completions.create(
         model=model,
         messages=messages,
-        temperature=0.3
+        temperature=0.8
+    )
+
+    return token_info , response.choices[0].message.content
+
+def generate_input_for_TrickyBugs_DP(client , specification , put_code , model: str):
+    system_prompt = """**INSTRUCTION**:
+You are a professional software testing engineer. You will get a problem description of a coding problem, and a piece of code attempting to solve the problem. Please generate 10 diverse and corner test inputs that could potentially trigger bugs.
+Every input must adhere to the constraints and format mentioned in the problem description.
+Please reply with ONLY the generated input without any other content, use the following template:
+INPUT1:
+(content of the 1st generated test input)
+INPUT2:
+(content of the 2nd generated test input)
+...
+INPUT10:
+(content of the 10th generated test input)
+
+"""
+    user_prompt = """**PROBLEM DESCRIPTION**:
+""" 
+    user_prompt += specification + "\n"
+    user_prompt += """**CODE**:
+"""
+    user_prompt += put_code
+
+    messages = [
+        {'role': 'system' , 'content' : system_prompt} ,
+        {'role': 'user' , 'content': user_prompt}
+    ]
+
+    token_info = check_prompt_fit(messages , model)
+    if token_info['fits'] is False:
+        return token_info , "The length of context is out of bound !!!"
+    
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=0.8
+    )
+
+    return token_info , response.choices[0].message.content
+
+def generate_input_for_EvalPlus_DP(client , put_code , model):
+    system_prompt = """**INSTRCUTION**:
+You are a professional software testing engineer. 
+You will get a Python function, and the comments below the function signature is the docstring that specifies the requirement of the function.
+
+Please generate 10 diverse and corner test inputs to test the function.
+Every input must adhere to the type and format according to the function signature. The format of the input can be referenced from the example in the docstring. If there are multiple parameters, combine all parameters into a list.
+Write each generated input in a list format, with one input per line, totaling ten lines.
+Please reply with ONLY the generated input without any other content. 
+
+
+**EXAMPLE**:
+Here is an example:
+
+If the given function and docstring is like:
+```
+def has_close_elements(numbers: List[float], threshold: float) -> bool:
+    \"\"\" Check if in given list of numbers, are any two numbers closer to each other than
+    given threshold.
+    >>> has_close_elements([1.0, 2.0, 3.0], 0.5)
+    False
+    >>> has_close_elements([1.0, 2.8, 3.0, 4.0, 5.0, 2.0], 0.3)
+    True
+    \"\"\"
+    for i in range(len(numbers)):
+        for j in range(i + 1, len(numbers)):
+            if abs(numbers[i] - numbers[j]) <= threshold:
+                return True
+    return False
+```
+
+Then your reply should be like the following format:
+```
+[[1.0, 2.5, 3.0, 4.5, 5.0, 6.5], 0.4]
+[[1.0, 2.0, 3.0, 2.9, 5.0, 6.0], 0.1]
+[[0.5, 0.6, 0.7, 0.8, 0.9], 0.05]
+[[10.5, 20.5, 30.5, 25.5, 40.5], 4.0]
+[[1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7], 0.2]
+[[0.1, 0.5, 1.0, 1.5, 2.0], 0.1]
+[[1.2, 2.4, 3.6, 4.8], 0.8]
+[[-1.0, -0.5, 0.0, 0.5, 1.0], 0.3]
+[[-2.0, 2.0, 3.0, 4.0], 1.5]
+[[1.0, 2.0, 3.0, 4.0, 5.0], 0.5]
+```
+"""
+    user_prompt = """**Function Signature and Doctoring**:
+"""
+    user_prompt += put_code
+
+    messages = [
+        {'role': 'system' , 'content' : system_prompt} , 
+        {'role': 'user' , 'content': user_prompt}
+    ]
+
+    token_info = check_prompt_fit(messages , model)
+    if token_info['fits'] is False:
+        return token_info , "The length of context is out of bound !!!"
+    
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=0.8
     )
 
     return token_info , response.choices[0].message.content
@@ -372,7 +477,7 @@ def parse_and_generate_test(client , model:str , mode):
 
                 try_num += 1
 
-def parse_and_generate_test_for_TrickyBugs(client , model: str):
+def parse_and_generate_test_for_TrickyBugs(client , model: str , k):
     pid = os.getpid()
     dataset_code_dir = "./Datasets/TrickyBugs/PUT_python"
     specification_dir = "./Datasets/TrickyBugs/problem_descriptions"
@@ -388,12 +493,12 @@ def parse_and_generate_test_for_TrickyBugs(client , model: str):
         assert specification is not None
         token_info , response = generate_input_for_TrickyBugs(client , specification , pid, model)
 
-        test_generator_dir = f"./TrickyBugs/{model}/GenInputs/tc_generator_python"
+        test_generator_dir = f"./TrickyBugs/{model}/{k}/GenInputs/tc_generator_python"
 
         result_path = os.path.join(test_generator_dir , dir)
         os.makedirs(result_path , exist_ok=True)
 
-        test_input_dir = os.path.join(f"./TrickyBugs/{model}/GenInputs/tc_inputs_generator" , dir)
+        test_input_dir = os.path.join(f"./TrickyBugs/{model}/{k}/GenInputs/tc_inputs_generator" , dir)
 
         if not os.path.exists(test_input_dir):
             os.makedirs(test_input_dir , exist_ok=True)
@@ -401,6 +506,40 @@ def parse_and_generate_test_for_TrickyBugs(client , model: str):
         with open(os.path.join(result_path ,  file_name + "_test_generator") , 'w' , encoding='utf-8') as f:
             f.write(response)
             f.close()
+
+def parse_and_generate_test_for_TrickyBugs_DP(client , model: str , k):
+    dataset_code_dir = "./Datasets/TrickyBugs/PUT_python"
+    specification_dir = "./Datasets/TrickyBugs/problem_descriptions"
+
+    for dir in os.listdir(dataset_code_dir):
+        file_name = os.listdir(os.path.join(dataset_code_dir , dir))[0].split(".")[0]
+        print(file_name)
+
+        with open(os.path.join(specification_dir , dir , "problem_description.txt") , 'r' , encoding="utf-8") as f:
+            specification = f.read()
+            f.close()
+
+        with open(os.path.join(dataset_code_dir , dir , file_name + ".py") , 'r' , encoding="utf-8") as f:
+            put_code = f.read()
+            f.close()
+
+        assert specification is not None
+        token_info , response = generate_input_for_TrickyBugs_DP(client , specification , put_code , model)
+
+        test_generator_dir = f"./TrickyBugs/DP/{model}/{k}/GenInputs/dp_generator_python"
+
+        result_path = os.path.join(test_generator_dir , dir)
+        os.makedirs(result_path , exist_ok=True)
+
+        # test_input_dir = os.path.join(f"./TrickyBugs/{model}/GenInputs/tc_inputs_generator" , dir)
+
+        # if not os.path.exists(test_input_dir):
+        #     os.makedirs(test_input_dir , exist_ok=True)
+        
+        with open(os.path.join(result_path ,  file_name + "_test_generator") , 'w' , encoding='utf-8') as f:
+            f.write(response)
+            f.close()
+
 
 def parse_and_generate_for_EvalPlus(client , model: str):
     dataset_code_dir = "./Datasets/EvalPlus/PUTs"
@@ -412,14 +551,12 @@ def parse_and_generate_for_EvalPlus(client , model: str):
             put_code = f.read()
             f.close()
 
-        token_info , response = generate_input_for_TrickyBugs(client , put_code, model)
+        token_info , response = generate_input_for_EvalPlus(client , put_code, model)
 
-        test_generator_dir = f"./TrickyBugs/{model}/GenInputs/tc_generator_python"
+        test_generator_dir = f"./EvalPlus/{model}/GenInputs/tc_generator_python"
 
         result_path = os.path.join(test_generator_dir , dir)
         os.makedirs(result_path , exist_ok=True)
-
-        test_input_dir = os.path.join(f"./TrickyBugs/{model}/GenInputs/tc_inputs_generator" , dir)
 
         # if not os.path.exists(test_input_dir):
         #     os.makedirs(test_input_dir , exist_ok=True)
@@ -427,7 +564,30 @@ def parse_and_generate_for_EvalPlus(client , model: str):
         with open(os.path.join(result_path ,  dir + "_test_generator") , 'w' , encoding='utf-8') as f:
             f.write(response)
             f.close()
+
+def parse_and_generate_for_EvalPlus_DP(client , model: str):
+    dataset_code_dir = "./Datasets/EvalPlus/PUTs"
+    
+    for dir in os.listdir(dataset_code_dir):
+        print(dir)
+
+        with open(os.path.join(dataset_code_dir , dir , "put0.py") , 'r' , encoding="utf-8") as f:
+            put_code = f.read()
+            f.close()
+
+        token_info , response = generate_input_for_EvalPlus_DP(client , put_code, model)
+
+        test_generator_dir = f"./EvalPlus/DP/{model}/GenInputs/dp_generator_python"
+
+        result_path = os.path.join(test_generator_dir , dir)
+        os.makedirs(result_path , exist_ok=True)
+
+        # if not os.path.exists(test_input_dir):
+        #     os.makedirs(test_input_dir , exist_ok=True)
         
+        with open(os.path.join(result_path ,  dir + "_test_generator") , 'w' , encoding='utf-8') as f:
+            f.write(response)
+            f.close()
 
 def extract_test_input(model: str , mode):
     if mode == 0:
@@ -459,8 +619,8 @@ def extract_test_input(model: str , mode):
                         print(input_test)
                         print("-------------------------")
 
-def extract_test_generator(model: str):
-    input_folder = f"./TrickyBugs/{model}/GenInputs/tc_generator_python"
+def extract_test_generator_for_TrickyBugs(model: str , k):
+    input_folder = f"./TrickyBugs/{model}/{k}/GenInputs/tc_generator_python"
     for dir in os.listdir(input_folder):
         for file in os.listdir(os.path.join(input_folder , dir)):
             with open(os.path.join(input_folder , dir , file) , 'r' , encoding="utf-8") as f:
@@ -487,16 +647,122 @@ def extract_test_generator(model: str):
             if not "import random" in code:
                 code = "import random\n" + code
             
-            extract_path = f"./TrickyBugs/{model}/GenInputs/tc_generator_python_extracted"
+            extract_path = f"./TrickyBugs/{model}/{k}/GenInputs/tc_generator_python_extracted"
             os.makedirs(os.path.join(extract_path , dir) , exist_ok=True)
 
             with open(os.path.join(extract_path , dir , file + ".py") , 'w' , encoding="utf-8") as f:
                 f.write(code)
                 f.close()
 
-def execute_input_generator(model: str):
-    generator_dir = f"./TrickyBugs/{model}/GenInputs/tc_generator_python_extracted"
-    for dir in os.listdir(generator_dir)[:1]:
+def extract_test_input_for_TrickyBugs_DP(model: str , k):
+    input_folder = f"./TrickyBugs/DP/{model}/{k}/GenInputs/dp_generator_python"
+    for dir in os.listdir(input_folder):
+        for file in os.listdir(os.path.join(input_folder , dir)):
+            count = 0
+            with open(os.path.join(input_folder , dir , file) , 'r' , encoding="utf-8") as f:
+                content = f.readlines()
+                f.close()
+
+            flag = False
+            input_extracted = []
+
+            for line in content:
+                if "INPUT" in line or "INPUTS" in line:
+                    if flag is False:
+                        flag = True
+                        continue
+                    else:
+                        extract_path = os.path.join(f"./TrickyBugs/DP/{model}/{k}/GenInputs/dp_inputs_generator" , dir)
+                        os.makedirs(extract_path , exist_ok=True)
+                        with open(os.path.join(extract_path , file.split(".")[0] + "_GenInput_" + str(count) + '.in') , 'w' , encoding='utf-8') as f:
+                            f.write("".join(input_extracted).strip('\n'))
+                            f.close()
+
+                        input_extracted = []
+                        count += 1
+                else:
+                    input_extracted.append(line)
+            
+            extract_path = os.path.join(f"./TrickyBugs/DP/{model}/{k}/GenInputs/dp_inputs_generator" , dir)
+            os.makedirs(extract_path , exist_ok=True)
+            with open(os.path.join(extract_path , file.split(".")[0] + "_GenInput_" + str(count) + '.in') , 'w' , encoding='utf-8') as f:
+                f.write("".join(input_extracted).strip('\n'))
+                f.close()
+
+
+def extract_test_generator_for_EvalPlus(model: str):
+    input_folder = f"./EvalPlus/{model}/GenInputs/tc_generator_python"
+    for dir in os.listdir(input_folder):
+        for file in os.listdir(os.path.join(input_folder , dir)):
+            with open(os.path.join(input_folder , dir , file) , 'r' , encoding="utf-8") as f:
+                content = f.read()
+                f.close()
+            
+            if "```python" in content or "```" in content:
+                lines = content.split("\n")
+                flag = False
+                code_line = []
+
+                for line in lines:
+                    if "```python" in line and flag is False:
+                        flag = True
+                    elif "```" in line and flag is True:
+                        break
+                    elif flag is True:
+                        code_line.append(line)
+                
+                code = "\n".join(code_line)
+            else:
+                code = content
+
+            if not "import random" in code and not "from random import" in code:
+                code = "import random\n" + code
+            
+            code = "import json\nimport os\n" + code
+            code += "\ninput_list = []"
+            code += "\nfor i in range(100):\n"
+            code += "\tinput = sample_one()\n"
+            code += "\tinput_list.append(input)\n"
+            code += "data = {'" + dir + "' : input_list}\n"
+            code += f"json_path = os.path.join('./EvalPlus/{model}/GenInputs/tc_inputs_generator' , '{dir}')\n"
+            code += "os.makedirs(json_path , exist_ok=True)\n"
+            code += f"with open(os.path.join(json_path , '{dir}' + '_inputs.json') , 'w' , encoding='utf-8') as f:\n"
+            code += "\tjson.dump(data , f)"
+
+            extract_path = f"./EvalPlus/{model}/GenInputs/tc_generator_python_extracted"
+            os.makedirs(os.path.join(extract_path , dir) , exist_ok=True)
+
+            with open(os.path.join(extract_path , dir , file + ".py") , 'w' , encoding="utf-8") as f:
+                f.write(code)
+                f.close()
+
+def extract_test_generator_for_EvalPlus_DP(model):
+    input_folder = f"./EvalPlus/DP/{model}/GenInputs/dp_generator_python"
+    for dir in os.listdir(input_folder):
+        for file in os.listdir(os.path.join(input_folder , dir)):
+            with open(os.path.join(input_folder , dir , file) , 'r' , encoding="utf-8") as f:
+                content = f.readlines()
+                f.close()
+
+            input_list = []
+            
+            for line in content:
+                if line.strip() != "":
+                    input_list.append(line.strip())
+
+            extract_path = f"./EvalPlus/DP/{model}/GenInputs/dp_input_generator"
+            os.makedirs(os.path.join(extract_path , dir) , exist_ok=True)
+
+            data = {dir : input_list}
+
+            with open(os.path.join(extract_path , dir , dir + "_inputs.json") , 'w' , encoding="utf-8") as f:
+                json.dump(data , f)
+
+
+
+def execute_input_generator(model: str , k):
+    generator_dir = f"./TrickyBugs/{model}/{k}/GenInputs/tc_generator_python_extracted"
+    for dir in os.listdir(generator_dir):
         for python_file in os.listdir(os.path.join(generator_dir , dir)):
             # with open(os.path.join(generator_dir , dir , python_file) , 'r' , encoding='utf-8') as f:
             #     code = f.read()
@@ -504,7 +770,7 @@ def execute_input_generator(model: str):
             if python_file.endswith(".py"):
                 python_file_path = os.path.join(".." , '..' , 'tc_generator_python_extracted' , dir , python_file)
                 try:
-                    exe_result = subprocess.run(["python" , python_file_path] , cwd=os.path.join(f"./TrickyBugs/{model}/GenInputs/tc_inputs_generator" , dir) , capture_output=True , text=True , timeout=5)
+                    exe_result = subprocess.run(["python" , python_file_path] , cwd=os.path.join(f"./TrickyBugs/{model}/{k}/GenInputs/tc_inputs_generator" , dir) , capture_output=True , text=True , timeout=5)
                     if exe_result.returncode != 0:
                         print(f'Error in {os.path.join(generator_dir , dir , python_file)}: {exe_result.stderr}')
                         continue
@@ -512,6 +778,20 @@ def execute_input_generator(model: str):
                     print(f'Subprocess called error')
                     continue
 
+def execute_input_generator_for_EvalPlus(model: str):
+    generator_dir = f"./EvalPlus/{model}/GenInputs/tc_generator_python_extracted"
+    for dir in os.listdir(generator_dir):
+        for python_file in os.listdir(os.path.join(generator_dir , dir)):
+            python_file_path = os.path.join(generator_dir , dir , python_file)
+            try:
+                # exe_result = subprocess.run(["python" , python_file_path] , cwd=os.path.join(f"./EvalPlus/{model}/GenInputs/tc_inputs_generator" , dir) , capture_output=True , text=True , timeout=5)
+                exe_result = subprocess.run(["python" , python_file_path] , capture_output=True , text=True , timeout=10)
+                if exe_result.returncode != 0:
+                    print(f'Error in {os.path.join(generator_dir , dir , python_file)}: {exe_result.stderr}')
+                    continue
+            except:
+                print(f'Subprocess called error')
+                continue
 
 if __name__ == "__main__":
     logging.basicConfig(
@@ -524,9 +804,13 @@ if __name__ == "__main__":
     # dataset_name = "TrickyBugs"
     dataset_name = 'EvalPlus'
 
-    model_name = "gpt-4o-mini"
-    # model_name = "gpt-3.5-turbo-1106"
+    # model_name = "gpt-4o-mini"
+    model_name = "gpt-3.5-turbo-1106"
 
+    # mode = "tc"
+    mode = "dp"
+
+    k = 6
     # modes = {'my' : 0 , 'essay': 1}
 
     # for _ , mode in modes.items():
@@ -543,11 +827,19 @@ if __name__ == "__main__":
     # execute_input_generator("gpt-3.5-turbo-1106")
     
     if dataset_name == "TrickyBugs":
-        parse_and_generate_test_for_TrickyBugs(client , model_name)
-        extract_test_generator(model_name)
+        if mode == 'tc':
+            parse_and_generate_test_for_TrickyBugs(client , model_name , k)
+            extract_test_generator_for_TrickyBugs(model_name , k)
 
-        execute_input_generator(model_name)
-
+            execute_input_generator(model_name , k)
+        elif mode == 'dp':
+            parse_and_generate_test_for_TrickyBugs_DP(client , model_name , k)
+            extract_test_input_for_TrickyBugs_DP(model_name , k)
     elif dataset_name == "EvalPlus":
-        parse_and_generate_for_EvalPlus(client , model_name)
-        
+        if mode == 'tc':
+            parse_and_generate_for_EvalPlus(client , model_name)
+            extract_test_generator_for_EvalPlus(model_name)
+            execute_input_generator_for_EvalPlus(model_name)
+        elif mode == 'dp':
+            parse_and_generate_for_EvalPlus_DP(client , model_name)
+            extract_test_generator_for_EvalPlus_DP(model_name)
